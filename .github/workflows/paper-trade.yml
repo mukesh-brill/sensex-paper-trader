@@ -39,7 +39,7 @@ jobs:
         run: |
           git config user.name "paper-trader-bot"
           git config user.email "paper-trader-bot@users.noreply.github.com"
-          git add -A state.json trades.csv REPORT.md reports || true
+          git add -A || true
           git commit -m "Paper trading update $(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M')" || echo "nothing to commit"
           git pull --rebase || true
           git push || true
