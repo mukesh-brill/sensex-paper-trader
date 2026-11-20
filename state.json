@@ -1,0 +1,24 @@
+{
+ "started": "2026-11-20",
+ "books": {
+  "TRAIL": {
+   "pos": null,
+   "day": "2026-11-20",
+   "losses": 0,
+   "last_exit_ts": 0
+  },
+  "SLIDE": {
+   "pos": null,
+   "day": "2026-11-20",
+   "losses": 0,
+   "last_exit_ts": 0
+  },
+  "BT75": {
+   "pos": null,
+   "day": "2026-11-20",
+   "losses": 0,
+   "last_exit_ts": 0
+  }
+ },
+ "trades": []
+}
