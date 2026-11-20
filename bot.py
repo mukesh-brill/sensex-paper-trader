@@ -21,7 +21,7 @@ Three virtual books trade the same signals side by side (P&L always uses the ATM
 
 Data: Groww public chart / option endpoints (same data as the Groww website).
 """
-import json, os, re, sys, time, math, subprocess, urllib.request, urllib.error
+import json, os, re, sys, time, math, subprocess, urllib.request, urllib.error, urllib.parse
 from datetime import datetime, timedelta, timezone, date
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -172,15 +172,52 @@ def load_state():
 def save_state(s):
     with open(STATE_FILE, "w") as f: json.dump(s, f, indent=1)
 
-def notify(text):
+def notify(text, daily=False, subject=None):
+    """Sends to every channel that has its secrets set. Email only gets the daily report."""
     tok, chat = os.getenv("TELEGRAM_TOKEN"), os.getenv("TELEGRAM_CHAT_ID")
-    if not (tok and chat): return
+    if tok and chat:
+        try:
+            data = json.dumps({"chat_id": chat, "text": text[:4000]}).encode()
+            req = urllib.request.Request(f"https://api.telegram.org/bot{tok}/sendMessage", data=data,
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=15).read()
+        except Exception as e: log("telegram failed:", e)
+    phone, key = os.getenv("WHATSAPP_PHONE"), os.getenv("CALLMEBOT_APIKEY")
+    if phone and key and (daily or os.getenv("WHATSAPP_TRADE_ALERTS", "1") == "1"):
+        try:
+            q = urllib.parse.urlencode({"phone": phone, "text": text[:1500], "apikey": key})
+            urllib.request.urlopen(f"https://api.callmebot.com/whatsapp.php?{q}", timeout=30).read()
+        except Exception as e: log("whatsapp failed:", e)
+
+def send_email(subject, markdown_text):
+    user, pw = os.getenv("GMAIL_USER"), os.getenv("GMAIL_APP_PASSWORD")
+    to = os.getenv("REPORT_EMAIL_TO") or user
+    if not (user and pw): return
+    import smtplib, html
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    # simple markdown -> html (headings, tables, paragraphs)
+    out, in_tbl = [], False
+    for line in markdown_text.splitlines():
+        if line.startswith("|"):
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if set("".join(cells)) <= set("-: "): continue
+            if not in_tbl: out.append('<table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:13px">'); in_tbl = True; tag = "th"
+            else: tag = "td"
+            out.append("<tr>" + "".join(f"<{tag}>{html.escape(c).replace('**','')}</{tag}>" for c in cells) + "</tr>")
+            continue
+        if in_tbl: out.append("</table>"); in_tbl = False
+        if line.startswith("## "): out.append(f"<h3>{html.escape(line[3:])}</h3>")
+        elif line.startswith("# "): out.append(f"<h2>{html.escape(line[2:])}</h2>")
+        elif line.strip(): out.append(f"<p>{html.escape(line)}</p>")
+    if in_tbl: out.append("</table>")
+    msg = MIMEMultipart("alternative"); msg["Subject"] = subject; msg["From"] = user; msg["To"] = to
+    msg.attach(MIMEText(markdown_text, "plain")); msg.attach(MIMEText("\n".join(out), "html"))
     try:
-        data = json.dumps({"chat_id": chat, "text": text[:4000]}).encode()
-        req = urllib.request.Request(f"https://api.telegram.org/bot{tok}/sendMessage", data=data,
-                                     headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=15).read()
-    except Exception as e: log("telegram failed:", e)
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as s:
+            s.login(user, pw); s.sendmail(user, [a.strip() for a in to.split(",")], msg.as_string())
+        log("email sent to", to)
+    except Exception as e: log("email failed:", e)
 
 # ---------------- trade management ----------------
 def open_trade(state, book, side, spot, sig_ts, today):
@@ -282,7 +319,16 @@ def write_report(state, today):
     with open("REPORT.md", "w") as f: f.write("\n".join(summ) + "\n")
     if os.getenv("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f: f.write(txt + "\n")
-    notify(txt.replace("|", " ")[:3900])
+    # short version for chat apps, full report by email
+    short = [f"Sensex paper trades {d}"]
+    for book in BOOKS:
+        n, w, tot = stats([t for t in day_tr if t["book"] == book])
+        cn, cw, ctot = stats([t for t in state["trades"] if t["book"] == book])
+        short.append(f"{book}: today {n} trades, {w:.0f}% win, Rs{tot:,.0f} | total Rs{ctot:,.0f}")
+    if note: short.append(note)
+    notify("\n".join(short), daily=True)
+    full = txt + "\n\n" + "\n".join(summ)
+    send_email(f"Sensex paper trading report {d}", full)
     log("report written")
 
 # ---------------- live loop ----------------
