@@ -3,21 +3,21 @@
  "books": {
   "TRAIL": {
    "pos": null,
-   "day": "2026-11-23",
-   "losses": 2,
-   "last_exit_ts": 1795407660
+   "day": "2026-11-24",
+   "losses": 0,
+   "last_exit_ts": 0
   },
   "SLIDE": {
    "pos": null,
-   "day": "2026-11-23",
-   "losses": 2,
-   "last_exit_ts": 1795407180
+   "day": "2026-11-24",
+   "losses": 0,
+   "last_exit_ts": 0
   },
   "BT75": {
    "pos": null,
-   "day": "2026-11-23",
-   "losses": 2,
-   "last_exit_ts": 1795409640
+   "day": "2026-11-24",
+   "losses": 0,
+   "last_exit_ts": 0
   }
  },
  "trades": [
@@ -216,5 +216,8 @@
    "reason": "SL",
    "vix": 18.2
   }
- ]
+ ],
+ "day_notes": {
+  "2026-11-24": "No market data today (holiday?)"
+ }
 }
